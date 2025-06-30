@@ -1,56 +1,45 @@
 import argparse
 import os
-from sysroot.patcher import patch_boot, inject_custom_su, repack_boot, unpack_boot
+from sysroot.patcher import fix_boot_image
+from sysroot.device import auto_detect_boot_image
 
 def main():
     parser = argparse.ArgumentParser(description="SysRoot CLI - Native Systemless Root Tool")
     subparsers = parser.add_subparsers(dest="command")
 
-    # patch-boot command
-    patch_parser = subparsers.add_parser("patch-boot", help="Patch boot image with SU")
-    patch_parser.add_argument("bootimg", help="Path to stock boot image")
-
-    # inject-su command
-    inject_parser = subparsers.add_parser("inject-su", help="Inject SU binary into unpacked ramdisk")
-    inject_parser.add_argument("ramdisk_dir", help="Path to unpacked ramdisk folder")
-
-    # detect-fastboot command
-    subparsers.add_parser("detect-fastboot", help="Detect fastboot device")
-
-    # flash-boot command (for flashing)
-    flash_parser = subparsers.add_parser("flash-boot", help="Flash patched boot image")
-    flash_parser.add_argument("bootimg", help="Path to patched boot image")
+    # Add commands
+    subparsers.add_parser("auto-patch", help="Auto-detect boot image and patch")
+    subparsers.add_parser("patch-boot", help="Patch boot image with SU")
+    subparsers.add_parser("flash-boot", help="Flash patched boot image")
 
     args = parser.parse_args()
 
-    if args.command == "patch-boot":
+    if args.command == "auto-patch":
+        from sysroot.patcher import fix_boot_image
+        boot_img = auto_detect_boot_image()
+        if not boot_img:
+            boot_img = input("📁 Enter boot image path: ").strip()
+        if fix_boot_image(boot_img):
+            print("🎉 Patch complete!")
+        else:
+            print("❌ Patch failed")
+
+    elif args.command == "patch-boot":
+        from sysroot.patcher import patch_boot
         if patch_boot(args.bootimg):
             print("✅ Patch completed successfully!")
         else:
-            print("❌ Patch failed. Check logs.")
-
-    elif args.command == "inject-su":
-        if os.path.isdir(args.ramdisk_dir):
-            if inject_custom_su(args.ramdisk_dir):
-                print("✅ SU injected into ramdisk")
-            else:
-                print("❌ SU injection failed")
-        else:
-            print("❌ Ramdisk folder does not exist")
-
-    elif args.command == "detect-fastboot":
-        from sysroot.device import check_fastboot_connection
-        if check_fastboot_connection():
-            print("📱 Fastboot device detected.")
-        else:
-            print("❌ No fastboot device found.")
+            print("❌ Patch failed")
 
     elif args.command == "flash-boot":
         from sysroot.device import flash_boot
         if os.path.exists(args.bootimg):
             flash_boot(args.bootimg)
         else:
-            print("❌ Boot image file not found")
+            print("❌ Boot image not found")
 
     else:
         parser.print_help()
+
+if __name__ == "__main__":
+    main()
